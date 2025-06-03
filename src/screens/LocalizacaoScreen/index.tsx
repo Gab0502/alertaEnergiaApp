@@ -49,14 +49,7 @@ const initialLocations: Location[] = [
     status: "Normal",
     lastUpdate: new Date().toLocaleTimeString(),
   },
-  {
-    id: 3,
-    name: "Copacabana",
-    city: "Rio de Janeiro",
-    cep: "22070-900",
-    status: "Normal",
-    lastUpdate: new Date().toLocaleTimeString(),
-  },
+
 ];
 
 export default function MonitoramentoScreen() {
