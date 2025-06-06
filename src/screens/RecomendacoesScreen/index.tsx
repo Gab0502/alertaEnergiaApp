@@ -21,8 +21,8 @@ const preventiveTips = [
   {
     category: "Antes da Falta de Energia",
     icon: Battery,
-    color: "#bfdbfe", // bg-blue-100
-    textColor: "#1e40af", // text-blue-700
+    color: "#bfdbfe", 
+    textColor: "#1e40af", 
     tips: [
       "Mantenha lanternas e pilhas sempre à mão",
       "Tenha um kit de emergência com água e alimentos não perecíveis",
@@ -34,8 +34,8 @@ const preventiveTips = [
   {
     category: "Durante a Interrupção",
     icon: Zap,
-    color: "#fed7aa", // bg-orange-100
-    textColor: "#c2410c", // text-orange-700
+    color: "#fed7aa", 
+    textColor: "#c2410c", 
     tips: [
       "Desligue equipamentos eletrônicos para evitar danos",
       "Evite abrir geladeira e freezer desnecessariamente",
@@ -47,8 +47,8 @@ const preventiveTips = [
   {
     category: "Após o Restabelecimento",
     icon: CheckCircle,
-    color: "#bbf7d0", // bg-green-100
-    textColor: "#166534", // text-green-700
+    color: "#bbf7d0", 
+    textColor: "#166534", 
     tips: [
       "Ligue equipamentos gradualmente",
       "Verifique se alimentos refrigerados estão próprios para consumo",
@@ -85,8 +85,8 @@ export default function RecomendacoesScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Emergency Contacts */}
-      <View style={[styles.card, { backgroundColor: "#fee2e2" /* red-50 */ }]}>
+      {}
+      <View style={[styles.card, { backgroundColor: "#fee2e2"  }]}>
         <View style={styles.cardHeader}>
           <View style={styles.titleContainer}>
             <Phone color="#b91c1c" width={20} height={20} />
@@ -111,7 +111,7 @@ export default function RecomendacoesScreen() {
         </View>
       </View>
 
-      {/* Safety Alerts */}
+      {}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.titleContainer}>
@@ -129,7 +129,7 @@ export default function RecomendacoesScreen() {
         </View>
       </View>
 
-      {/* Preventive Tips */}
+      {}
       {preventiveTips.map(({ category, icon: Icon, color, textColor, tips }, idx) => (
         <View key={idx} style={styles.card}>
           <View style={styles.cardHeader}>
@@ -151,49 +151,6 @@ export default function RecomendacoesScreen() {
         </View>
       ))}
 
-      {/* Quick Actions */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View style={styles.titleContainer}>
-            <Lightbulb color="#ca8a04" width={20} height={20} />
-            <Text style={styles.cardTitle}>Ações Rápidas</Text>
-          </View>
-        </View>
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickActionButton}>
-            <Home color="#000" width={20} height={20} />
-            <Text style={styles.quickActionText}>Kit de Emergência</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionButton}>
-            <Battery color="#000" width={20} height={20} />
-            <Text style={styles.quickActionText}>Checklist</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionButton}>
-            <Shield color="#000" width={20} height={20} />
-            <Text style={styles.quickActionText}>Protocolo</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionButton}>
-            <AlertTriangle color="#000" width={20} height={20} />
-            <Text style={styles.quickActionText}>Reportar</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Additional Resources */}
-      <View style={[styles.card, { backgroundColor: "#eff6ff" /* blue-50 */ }]}>
-        <View style={[styles.cardContent, { alignItems: "center" }]}>
-          <Lightbulb color="#2563eb" width={32} height={32} />
-          <Text style={[styles.additionalTitle, { color: "#1e40af" }]}>
-            Recursos Adicionais
-          </Text>
-          <Text style={[styles.additionalText, { color: "#1e40af" }]}>
-            Acesse nosso centro de recursos para mais informações sobre preparação para emergências
-          </Text>
-          <TouchableOpacity style={styles.resourceButton}>
-            <Text style={styles.resourceButtonText}>Acessar Recursos</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
     </ScrollView>
   );
 }
@@ -228,7 +185,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cardContent: {
-    // default padding for content
+
   },
   contactRow: {
     flexDirection: "row",

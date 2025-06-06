@@ -266,7 +266,7 @@ export default function MonitoramentoScreen() {
               ]}
               disabled={loading}
             >
-              <Filter width={16} height={16} color="#374151" />
+              <Search width={16} height={16} color="#374151" />
             </Button>
           </View>
 

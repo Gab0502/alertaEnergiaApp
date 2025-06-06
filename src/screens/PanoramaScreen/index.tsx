@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, Alert, Modal } from "react-native";
+import {
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  TextInput,
+  Alert,
+  Modal,
+} from "react-native";
 import { Card, Badge, Button } from "react-native-paper";
 import { AlertTriangle, Zap, Clock, Users, X } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from '@react-navigation/native';
 
-// --- Tipagem de Status ---
 type EventStatus = "Ativo" | "Resolvido";
 type EventSeverity = "Crítico" | "Alto" | "Médio" | "Baixo";
 
-// --- Interfaces para Dados ---
 interface StatItem {
   title: string;
   value: string;
@@ -27,7 +36,6 @@ interface RecentEvent {
   timestamp: number;
 }
 
-// --- Dados Estáticos Iniciais ---
 const initialRecentEvents: RecentEvent[] = [
   {
     id: 1,
@@ -47,52 +55,75 @@ const initialRecentEvents: RecentEvent[] = [
   },
 ];
 
-// --- Funções Auxiliares para Estilos ---
 const getSeverityBadgeStyle = (severity: EventSeverity) => {
   switch (severity) {
-    case "Crítico": return { borderColor: "#dc2626", color: "#dc2626" };
-    case "Alto": return { borderColor: "#f97316", color: "#f97316" };
-    case "Médio": return { borderColor: "#eab308", color: "#eab308" };
-    case "Baixo": return { borderColor: "#22c55e", color: "#22c55e" };
-    default: return { borderColor: "#6b7280", color: "#6b7280" };
+    case "Crítico":
+      return { borderColor: "#dc2626", color: "#dc2626" };
+    case "Alto":
+      return { borderColor: "#f97316", color: "#f97316" };
+    case "Médio":
+      return { borderColor: "#eab308", color: "#eab308" };
+    case "Baixo":
+      return { borderColor: "#22c55e", color: "#22c55e" };
+    default:
+      return { borderColor: "#6b7280", color: "#6b7280" };
   }
 };
 
 const getStatusBadgeStyle = (status: EventStatus) => {
   switch (status) {
-    case "Ativo": return { borderColor: "#dc2626", color: "#dc2626" };
-    case "Resolvido": return { borderColor: "#22c55e", color: "#22c55e" };
-    default: return { borderColor: "#6b7280", color: "#6b7280" };
+    case "Ativo":
+      return { borderColor: "#dc2626", color: "#dc2626" };
+    case "Resolvido":
+      return { borderColor: "#22c55e", color: "#22c55e" };
+    default:
+      return { borderColor: "#6b7280", color: "#6b7280" };
   }
 };
 
-// --- Componente Principal ---
 export default function PanoramaScreen() {
   const [currentStats, setCurrentStats] = useState<StatItem[]>([]);
-  const [currentRecentEvents, setCurrentRecentEvents] = useState<RecentEvent[]>([]);
+  const [currentRecentEvents, setCurrentRecentEvents] = useState<RecentEvent[]>(
+    []
+  );
   const [loadingData, setLoadingData] = useState(true);
   const [showReportModal, setShowReportModal] = useState(false);
   const [newEventLocation, setNewEventLocation] = useState("");
   const [newEventDuration, setNewEventDuration] = useState("");
-  const [newEventSeverity, setNewEventSeverity] = useState<EventSeverity>("Médio");
+  const [newEventSeverity, setNewEventSeverity] =
+    useState<EventSeverity>("Médio");
+    const navigation = useNavigation();
 
-  // Função para atualizar estatísticas
   const updateStats = useCallback((events: RecentEvent[]) => {
-    const activeEventsCount = events.filter(e => e.status === "Ativo").length;
-    const affectedCities = new Set(events.map(e => e.location.split(' - ')[1])).size;
-    
-    const activeDurations = events.filter(e => e.status === "Ativo" && e.duration.includes('h')).map(e => {
-        const parts = e.duration.split('h');
-        const hours = parseFloat(parts[0]);
-        const minutes = parts[1] ? parseFloat(parts[1].replace('min', '')) / 60 : 0;
-        return hours + minutes;
-    }).filter(d => !isNaN(d));
+    const activeEventsCount = events.filter((e) => e.status === "Ativo").length;
+    const affectedCities = new Set(
+      events.map((e) => e.location.split(" - ")[1])
+    ).size;
 
-    const averageDuration = activeDurations.length > 0
-        ? (activeDurations.reduce((sum, d) => sum + d, 0) / activeDurations.length).toFixed(1)
+    const activeDurations = events
+      .filter((e) => e.status === "Ativo" && e.duration.includes("h"))
+      .map((e) => {
+        const parts = e.duration.split("h");
+        const hours = parseFloat(parts[0]);
+        const minutes = parts[1]
+          ? parseFloat(parts[1].replace("min", "")) / 60
+          : 0;
+        return hours + minutes;
+      })
+      .filter((d) => !isNaN(d));
+
+    const averageDuration =
+      activeDurations.length > 0
+        ? (
+            activeDurations.reduce((sum, d) => sum + d, 0) /
+            activeDurations.length
+          ).toFixed(1)
         : "0.0";
 
-    const estimatedAffectedPeople = (activeEventsCount * 400 + Math.floor(Math.random() * 200)).toFixed(0);
+    const estimatedAffectedPeople = (
+      activeEventsCount * 400 +
+      Math.floor(Math.random() * 200)
+    ).toFixed(0);
 
     setCurrentStats([
       {
@@ -130,19 +161,25 @@ export default function PanoramaScreen() {
     ]);
   }, []);
 
-  // Carrega dados do AsyncStorage
   useEffect(() => {
     const fetchData = async () => {
       setLoadingData(true);
       try {
         const savedEvents = await AsyncStorage.getItem("powerOutageEvents");
-        let eventsToUse: RecentEvent[] = savedEvents ? JSON.parse(savedEvents) : initialRecentEvents;
-        
+        let eventsToUse: RecentEvent[] = savedEvents
+          ? JSON.parse(savedEvents)
+          : initialRecentEvents;
+
         if (!savedEvents) {
-          await AsyncStorage.setItem("powerOutageEvents", JSON.stringify(initialRecentEvents));
+          await AsyncStorage.setItem(
+            "powerOutageEvents",
+            JSON.stringify(initialRecentEvents)
+          );
         }
-        
-        setCurrentRecentEvents(eventsToUse.sort((a, b) => b.timestamp - a.timestamp));
+
+        setCurrentRecentEvents(
+          eventsToUse.sort((a, b) => b.timestamp - a.timestamp)
+        );
         updateStats(eventsToUse);
       } catch (error) {
         console.error("Erro ao carregar dados:", error);
@@ -156,37 +193,42 @@ export default function PanoramaScreen() {
     fetchData();
   }, [updateStats]);
 
-  // Temporizador para resolver eventos automaticamente
   useEffect(() => {
     if (currentRecentEvents.length === 0) return;
 
-    const activeEvents = currentRecentEvents.filter(event => event.status === "Ativo");
+    const activeEvents = currentRecentEvents.filter(
+      (event) => event.status === "Ativo"
+    );
     if (activeEvents.length === 0) return;
 
-    const timers = activeEvents.map(event => {
-      // Tempo aleatório entre 5 e 30 minutos
+    const timers = activeEvents.map((event) => {
+
       const randomTime = Math.floor(Math.random() * 25 * 60) + 5 * 60;
-      console.log(randomTime)
+      console.log(randomTime);
       return setTimeout(async () => {
         try {
-          const updatedEvents = currentRecentEvents.map(e => 
+          const updatedEvents = currentRecentEvents.map((e) =>
             e.id === event.id ? { ...e, status: "Resolvido" as EventStatus } : e
           );
-          
-          const sortedEvents = updatedEvents.sort((a, b) => b.timestamp - a.timestamp);
+
+          const sortedEvents = updatedEvents.sort(
+            (a, b) => b.timestamp - a.timestamp
+          );
           setCurrentRecentEvents(sortedEvents);
           updateStats(sortedEvents);
-          await AsyncStorage.setItem("powerOutageEvents", JSON.stringify(sortedEvents));
+          await AsyncStorage.setItem(
+            "powerOutageEvents",
+            JSON.stringify(sortedEvents)
+          );
         } catch (error) {
           console.error("Erro ao atualizar evento:", error);
         }
       }, randomTime);
     });
 
-    return () => timers.forEach(timer => clearTimeout(timer));
+    return () => timers.forEach((timer) => clearTimeout(timer));
   }, [currentRecentEvents, updateStats]);
 
-  // Reportar novo evento
   const handleReportEvent = async () => {
     if (!newEventLocation.trim() || !newEventDuration.trim()) {
       Alert.alert("Erro", "Preencha todos os campos para reportar o evento.");
@@ -205,7 +247,10 @@ export default function PanoramaScreen() {
     try {
       const updatedEvents = [newEvent, ...currentRecentEvents];
       setCurrentRecentEvents(updatedEvents);
-      await AsyncStorage.setItem("powerOutageEvents", JSON.stringify(updatedEvents));
+      await AsyncStorage.setItem(
+        "powerOutageEvents",
+        JSON.stringify(updatedEvents)
+      );
       updateStats(updatedEvents);
 
       setNewEventLocation("");
@@ -229,14 +274,19 @@ export default function PanoramaScreen() {
         </View>
       ) : (
         <>
-          {/* Grid de Estatísticas */}
+          {}
           <View style={styles.statsGrid}>
             {currentStats.map((stat, i) => {
               const Icon = stat.icon;
               return (
                 <Card key={i} style={styles.statCard}>
                   <Card.Content style={styles.statCardContent}>
-                    <View style={[styles.iconContainer, { backgroundColor: stat.bgColor }]}>
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        { backgroundColor: stat.bgColor },
+                      ]}
+                    >
                       <Icon color={stat.color} width={24} height={24} />
                     </View>
                     <Text style={styles.statValue}>{stat.value}</Text>
@@ -248,7 +298,7 @@ export default function PanoramaScreen() {
             })}
           </View>
 
-          {/* Eventos Recentes */}
+          {}
           <Card style={styles.fullWidthCard}>
             <Card.Title
               title="Eventos Recentes"
@@ -261,28 +311,43 @@ export default function PanoramaScreen() {
                   <View key={event.id} style={styles.eventRow}>
                     <View style={styles.eventDetails}>
                       <Text style={styles.eventLocation}>{event.location}</Text>
-                      <Text style={styles.eventDuration}>Duração: {event.duration}</Text>
+                      <Text style={styles.eventDuration}>
+                        Duração: {event.duration}
+                      </Text>
                       <Text style={styles.eventTimestamp}>
-                        Reportado: {new Date(event.timestamp).toLocaleString('pt-BR')}
+                        Reportado:{" "}
+                        {new Date(event.timestamp).toLocaleString("pt-BR")}
                       </Text>
                     </View>
                     <View style={styles.badgesColumn}>
-                      <Badge style={[styles.badge, getStatusBadgeStyle(event.status)]}>
+                      <Badge
+                        style={[
+                          styles.badge,
+                          getStatusBadgeStyle(event.status),
+                        ]}
+                      >
                         {event.status}
                       </Badge>
-                      <Badge style={[styles.badge, getSeverityBadgeStyle(event.severity)]}>
+                      <Badge
+                        style={[
+                          styles.badge,
+                          getSeverityBadgeStyle(event.severity),
+                        ]}
+                      >
                         {event.severity}
                       </Badge>
                     </View>
                   </View>
                 ))
               ) : (
-                <Text style={styles.noEventsText}>Nenhum evento recente registrado.</Text>
+                <Text style={styles.noEventsText}>
+                  Nenhum evento recente registrado.
+                </Text>
               )}
             </Card.Content>
           </Card>
 
-          {/* Ações Rápidas */}
+          {}
           <Card style={styles.fullWidthCard}>
             <Card.Title
               title="Ações Rápidas"
@@ -292,20 +357,30 @@ export default function PanoramaScreen() {
             <Card.Content>
               <View style={styles.actionsGrid}>
                 <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: "#e0f2fe", borderColor: "#3b82f6" }]}
+                  style={[
+                    styles.actionButton,
+                    { backgroundColor: "#e0f2fe", borderColor: "#3b82f6" },
+                  ]}
                   activeOpacity={0.7}
                   onPress={() => setShowReportModal(true)}
                 >
                   <Zap color="#2563eb" width={28} height={28} />
-                  <Text style={[styles.actionText, { color: "#1e40af" }]}>Reportar Evento</Text>
+                  <Text style={[styles.actionText, { color: "#1e40af" }]}>
+                    Reportar Evento
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: "#dcfce7", borderColor: "#22c55e" }]}
+                  style={[
+                    styles.actionButton,
+                    { backgroundColor: "#dcfce7", borderColor: "#22c55e" },
+                  ]}
                   activeOpacity={0.7}
-                  onPress={() => Alert.alert("Alertas", "Funcionalidade em desenvolvimento!")}
+                  onPress={() => navigation.navigate("Localizacao" as never)}
                 >
                   <AlertTriangle color="#16a34a" width={28} height={28} />
-                  <Text style={[styles.actionText, { color: "#166534" }]}>Ver Alertas</Text>
+                  <Text style={[styles.actionText, { color: "#166534" }]}>
+                    Ver Alertas
+                  </Text>
                 </TouchableOpacity>
               </View>
             </Card.Content>
@@ -313,7 +388,7 @@ export default function PanoramaScreen() {
         </>
       )}
 
-      {/* Modal de Reporte */}
+      {}
       <Modal
         animationType="slide"
         transparent={true}
@@ -328,7 +403,9 @@ export default function PanoramaScreen() {
             >
               <X color="#6b7280" size={24} />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Reportar Nova Falta de Energia</Text>
+            <Text style={styles.modalTitle}>
+              Reportar Nova Falta de Energia
+            </Text>
 
             <TextInput
               style={styles.modalInput}
@@ -351,16 +428,26 @@ export default function PanoramaScreen() {
                   key={severityOption}
                   style={[
                     styles.severityOption,
-                    newEventSeverity === severityOption && styles.severityOptionSelected,
-                    getSeverityBadgeStyle(severityOption as EventSeverity)
+                    newEventSeverity === severityOption &&
+                      styles.severityOptionSelected,
+                    getSeverityBadgeStyle(severityOption as EventSeverity),
                   ]}
-                  onPress={() => setNewEventSeverity(severityOption as EventSeverity)}
+                  onPress={() =>
+                    setNewEventSeverity(severityOption as EventSeverity)
+                  }
                 >
-                  <Text style={[
-                    styles.severityOptionText,
-                    newEventSeverity === severityOption && styles.severityOptionTextSelected,
-                    { color: getSeverityBadgeStyle(severityOption as EventSeverity).color }
-                  ]}>
+                  <Text
+                    style={[
+                      styles.severityOptionText,
+                      newEventSeverity === severityOption &&
+                        styles.severityOptionTextSelected,
+                      {
+                        color: getSeverityBadgeStyle(
+                          severityOption as EventSeverity
+                        ).color,
+                      },
+                    ]}
+                  >
                     {severityOption}
                   </Text>
                 </TouchableOpacity>
@@ -379,7 +466,10 @@ export default function PanoramaScreen() {
               <Button
                 mode="contained"
                 onPress={handleReportEvent}
-                style={[styles.modalActionButton, { backgroundColor: "#2563eb" }]}
+                style={[
+                  styles.modalActionButton,
+                  { backgroundColor: "#2563eb" },
+                ]}
                 labelStyle={styles.modalButtonLabel}
               >
                 Reportar
@@ -392,7 +482,6 @@ export default function PanoramaScreen() {
   );
 }
 
-// Estilos (mantidos iguais ao anterior)
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
@@ -401,8 +490,8 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 40,
   },
   loadingText: {
@@ -508,7 +597,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     minWidth: 70,
     textAlign: "center",
-    backgroundColor: "#fffff"
+    backgroundColor: "#fffff",
   },
   noEventsText: {
     textAlign: "center",
@@ -552,10 +641,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     width: "90%",
-    position: 'relative',
+    position: "relative",
   },
   closeButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 10,
     right: 10,
     padding: 5,
@@ -580,17 +669,17 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
   severityPickerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
     marginBottom: 20,
     gap: 8,
   },
   severityLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: "600",
+    color: "#374151",
     marginRight: 10,
   },
   severityOption: {
@@ -598,14 +687,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 20,
     borderWidth: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: "#f9fafb",
   },
   severityOptionSelected: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: "#eff6ff",
   },
   severityOptionText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   severityOptionTextSelected: {},
   modalActions: {
@@ -619,10 +708,10 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 10,
     height: 50,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   modalButtonLabel: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });

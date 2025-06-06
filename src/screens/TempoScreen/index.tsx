@@ -1,349 +1,344 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { Card, Button, Badge } from 'react-native-paper'; // Use react-native-paper components
-import { Play, Pause, Square, Clock, AlertTriangle, CheckCircle, Info, Calendar } from 'lucide-react-native'; // Lucide icons as requested
-import AsyncStorage from '@react-native-async-storage/async-storage'; // For data persistence
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { Card, Button, Badge } from "react-native-paper";
+import {
+  Play,
+  Pause,
+  CircleStop,
+  Clock,
+  CheckCircle,
+  Info,
+} from "lucide-react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// --- Interfaces para Dados ---
-interface Outage {
-  id: string; // Unique ID for each outage
+interface PowerOutage {
+  id: string;
   location: string;
-  startTime: number; // Unix timestamp
-  endTime?: number; // Unix timestamp, optional for active outages
-  duration?: number; // Duration in milliseconds
-  status: 'active' | 'completed';
-  estimatedEnd?: number; // Unix timestamp
+  startTime: number;
+  endTime?: number;
+  duration?: number;
+  status: "active" | "completed";
 }
 
-// --- Funções Auxiliares de Tempo ---
 const formatDuration = (milliseconds: number) => {
   const totalSeconds = Math.floor(milliseconds / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return `${hours}h ${minutes}min ${seconds}s`;
+
+  const formatNumber = (num: number) => num.toString().padStart(2, "0");
+
+  return `${formatNumber(hours)}:${formatNumber(minutes)}:${formatNumber(
+    seconds
+  )}`;
 };
 
 const formatTime = (timestamp: number) => {
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return new Date(timestamp).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 const formatDate = (timestamp: number) => {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return new Date(timestamp).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
 };
 
-const TempoScreen = () => {
-  const [activeOutage, setActiveOutage] = useState<Outage | null>(null);
-  const [recentOutages, setRecentOutages] = useState<Outage[]>([]);
-  const [currentTimerDuration, setCurrentTimerDuration] = useState(0); // Duration for the quick timer
-  const [timerIntervalId, setTimerIntervalId] = useState<NodeJS.Timeout | null>(null);
-  const [loading, setLoading] = useState(true);
+const OutageTrackerScreen = () => {
+  const [activeOutage, setActiveOutage] = useState<PowerOutage | null>(null);
+  const [pastOutages, setPastOutages] = useState<PowerOutage[]>([]);
+  const [outageDuration, setOutageDuration] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // --- AsyncStorage Keys ---
-  const ACTIVE_OUTAGE_KEY = 'activeOutage';
-  const RECENT_OUTAGES_KEY = 'recentOutages';
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastUpdateRef = useRef<number>(Date.now());
 
-  // --- Função para carregar dados do AsyncStorage ---
-  const loadOutageData = useCallback(async () => {
-    setLoading(true);
+  const ACTIVE_OUTAGE_KEY = "activePowerOutage";
+  const PAST_OUTAGES_KEY = "pastPowerOutages";
+
+  const loadOutageData = async () => {
     try {
-      const storedActiveOutage = await AsyncStorage.getItem(ACTIVE_OUTAGE_KEY);
-      if (storedActiveOutage) {
-        const parsedOutage: Outage = JSON.parse(storedActiveOutage);
-        if (parsedOutage.status === 'active') {
-          setActiveOutage(parsedOutage);
-          // Recalculate duration if app was closed while timer was active
-          setCurrentTimerDuration(Date.now() - parsedOutage.startTime);
-          // Restart timer if active
-          const id = setInterval(() => {
-            setCurrentTimerDuration(prev => prev + 1000);
-          }, 1000);
-          setTimerIntervalId(id);
-        } else {
-          setActiveOutage(null); // Clear if somehow a completed outage is in active slot
+      const activeData = await AsyncStorage.getItem(ACTIVE_OUTAGE_KEY);
+      if (activeData) {
+        const outage: PowerOutage = JSON.parse(activeData);
+        if (outage.status === "active") {
+          setActiveOutage(outage);
+          const duration = Date.now() - outage.startTime;
+          setOutageDuration(duration);
+          startTimer();
         }
-      } else {
-        setActiveOutage(null);
       }
 
-      const storedRecentOutages = await AsyncStorage.getItem(RECENT_OUTAGES_KEY);
-      if (storedRecentOutages) {
-        setRecentOutages(JSON.parse(storedRecentOutages));
-      } else {
-        setRecentOutages([]); // Initialize empty if nothing found
-      }
+      const pastData = await AsyncStorage.getItem(PAST_OUTAGES_KEY);
+      setPastOutages(pastData ? JSON.parse(pastData) : []);
     } catch (error) {
-      console.error("Failed to load outage data:", error);
-      Alert.alert("Erro", "Não foi possível carregar os dados de interrupções.");
+      Alert.alert("Erro", "Falha ao carregar dados de interrupções");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, []);
+  };
 
-  // --- Efeito para carregar dados na montagem do componente ---
-  useEffect(() => {
-    loadOutageData();
+  const startTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setIsRunning(true);
+    lastUpdateRef.current = Date.now();
 
-    // Limpar o intervalo ao desmontar o componente
-    return () => {
-      if (timerIntervalId) {
-        clearInterval(timerIntervalId);
-      }
-    };
-  }, [loadOutageData, timerIntervalId]);
+    timerRef.current = setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - lastUpdateRef.current;
+      lastUpdateRef.current = now;
 
+      setOutageDuration((prev) => prev + elapsed);
+    }, 1000);
+  };
 
-  // --- Funções do Cronômetro Rápido ---
-  const handleStartTimer = async () => {
+  const startNewOutage = async () => {
     if (activeOutage) {
-      Alert.alert("Interrupção Ativa", "Já existe uma interrupção sendo monitorada. Finalize a atual para iniciar uma nova.");
+      Alert.alert(
+        "Atenção",
+        "Finalize a interrupção atual antes de iniciar outra"
+      );
       return;
     }
 
-    const newOutage: Outage = {
-      id: `active-${Date.now()}`,
-      location: 'Local Não Definido', // User can edit this later
+    const newOutage: PowerOutage = {
+      id: `outage-${Date.now()}`,
+      location: "Minha Região",
       startTime: Date.now(),
-      status: 'active',
+      status: "active",
     };
-    setActiveOutage(newOutage);
-    setCurrentTimerDuration(0);
-
-    const id = setInterval(() => {
-      setCurrentTimerDuration(prev => prev + 1000);
-    }, 1000);
-    setTimerIntervalId(id);
 
     try {
       await AsyncStorage.setItem(ACTIVE_OUTAGE_KEY, JSON.stringify(newOutage));
-      Alert.alert("Cronômetro Iniciado", "Interrupção de energia registrada. Comece a monitorar!");
+      setActiveOutage(newOutage);
+      setOutageDuration(0);
+      startTimer();
+      setIsRunning(true);
     } catch (error) {
-      console.error("Failed to save active outage:", error);
-      Alert.alert("Erro", "Não foi possível salvar a interrupção ativa.");
+      Alert.alert("Erro", "Falha ao registrar nova interrupção");
     }
   };
 
-  const handlePauseTimer = () => {
-    if (timerIntervalId) {
-      clearInterval(timerIntervalId);
-      setTimerIntervalId(null);
-      Alert.alert("Cronômetro Pausado", "A contagem de tempo foi pausada.");
-    }
-  };
+  const finishOutage = async () => {
+    if (!activeOutage) return;
 
-  const handleStopTimer = async () => {
-    if (!activeOutage) {
-      Alert.alert("Nenhuma Interrupção Ativa", "Não há interrupção ativa para finalizar.");
-      return;
-    }
-    if (timerIntervalId) {
-      clearInterval(timerIntervalId);
-      setTimerIntervalId(null);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
 
-    const completedOutage: Outage = {
+    const completedOutage: PowerOutage = {
       ...activeOutage,
       endTime: Date.now(),
-      duration: currentTimerDuration,
-      status: 'completed',
+      duration: outageDuration,
+      status: "completed",
     };
 
     try {
-      // Add to recent outages
-      const updatedRecentOutages = [completedOutage, ...recentOutages];
-      await AsyncStorage.setItem(RECENT_OUTAGES_KEY, JSON.stringify(updatedRecentOutages));
-      setRecentOutages(updatedRecentOutages);
+      const updatedHistory = [completedOutage, ...pastOutages];
+      await AsyncStorage.setItem(
+        PAST_OUTAGES_KEY,
+        JSON.stringify(updatedHistory)
+      );
+      setPastOutages(updatedHistory);
 
-      // Clear active outage
       await AsyncStorage.removeItem(ACTIVE_OUTAGE_KEY);
       setActiveOutage(null);
-      setCurrentTimerDuration(0);
-
-      Alert.alert("Interrupção Finalizada", `Interrupção de ${formatDuration(completedOutage.duration || 0)} registrada e movida para concluídas.`);
+      setOutageDuration(0);
     } catch (error) {
-      console.error("Failed to stop and save outage:", error);
-      Alert.alert("Erro", "Não foi possível finalizar a interrupção.");
+      Alert.alert("Erro", "Falha ao finalizar registro");
+    }
+  };
+  const [isRunning, setIsRunning] = useState(false);
+  const pauseTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+      setIsRunning(false)
     }
   };
 
-  // --- Função para "Finalizar Registro" de uma interrupção ativa ---
-  const handleFinishActiveOutage = async (outageId: string) => {
-    if (!activeOutage || activeOutage.id !== outageId) {
-      Alert.alert("Erro", "Interrupção ativa não encontrada.");
-      return;
-    }
+  useEffect(() => {
+    loadOutageData();
 
-    Alert.alert(
-      "Finalizar Interrupção",
-      "Tem certeza que deseja finalizar este registro de interrupção?",
-      [
-        {
-          text: "Cancelar",
-          style: "cancel",
-        },
-        {
-          text: "Finalizar",
-          onPress: handleStopTimer, // Calls the same stop logic for the active outage
-          style: "destructive",
-        },
-      ]
-    );
-  };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
-  // --- Funções para calcular estatísticas ---
-  const totalEvents = recentOutages.length + (activeOutage ? 1 : 0); // Active + completed
-  const totalDurationMs = recentOutages.reduce((sum, outage) => sum + (outage.duration || 0), 0);
-  const averageDurationMs = recentOutages.length > 0 ? totalDurationMs / recentOutages.length : 0;
+  const totalEvents = pastOutages.length + (activeOutage ? 1 : 0);
+  const totalDuration = pastOutages.reduce(
+    (sum, outage) => sum + (outage.duration || 0),
+    0
+  );
+  const avgDuration =
+    pastOutages.length > 0 ? totalDuration / pastOutages.length : 0;
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563eb" />
-        <Text style={styles.loadingText}>Carregando dados de interrupções...</Text>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={styles.loadingText}>Carregando dados...</Text>
       </View>
     );
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Cronômetro Rápido */}
-      <Card style={[styles.card, styles.blueBackground]}>
-        <Card.Content style={styles.quickTimerContent}>
-          <Play size={32} color="#2563EB" style={styles.iconCenter} />
-          <Text style={styles.quickTimerTitle}>Cronômetro Rápido</Text>
-          <Text style={styles.quickTimerSubtitle}>Para registrar uma nova interrupção</Text>
-          <Text style={styles.currentTimerText}>{formatDuration(currentTimerDuration)}</Text>
-          <View style={styles.buttonRow}>
-            <Button
-              mode="contained"
-              icon={() => <Play size={16} color="#fff" />}
-              onPress={handleStartTimer}
-              style={styles.actionButton}
-              labelStyle={styles.actionButtonLabel}
-              disabled={!!activeOutage}
-            >
-              Iniciar
-            </Button>
-            <Button
-              mode="outlined"
-              icon={() => <Pause size={16} color="#000" />}
-              onPress={handlePauseTimer}
-              style={styles.actionButtonOutline}
-              labelStyle={styles.actionButtonOutlineLabel}
-              disabled={!activeOutage || !timerIntervalId}
-            >
-              Pausar
-            </Button>
-            <Button
-              mode="outlined"
-              icon={() => <Square size={16} color="#000" />}
-              onPress={handleStopTimer}
-              style={styles.actionButtonOutline}
-              labelStyle={styles.actionButtonOutlineLabel}
-              disabled={!activeOutage}
-            >
-              Parar
-            </Button>
-          </View>
-        </Card.Content>
-      </Card>
+      {}
+      <Card style={styles.controlPanel}>
+        <Card.Content style={styles.timerPanel}>
+          <Text style={styles.timerDisplay}>
+            {formatDuration(outageDuration)}
+          </Text>
+          <Text style={styles.timerLabel}>Tempo Sem Energia</Text>
 
-      {/* Interrupções Ativas */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <View style={styles.sectionHeader}>
-            <Clock size={20} color="#DC2626" />
-            <Text style={styles.sectionTitle}>Interrupções Ativas</Text>
-          </View>
-          {activeOutage ? (
-            <View style={styles.outageCardActive}>
-              <View style={styles.outageHeader}>
-                <View>
-                  <Text style={styles.location}>{activeOutage.location}</Text>
-                  <Text style={styles.timeText}>Iniciado em {formatDate(activeOutage.startTime)} às {formatTime(activeOutage.startTime)}</Text>
-                </View>
-                <Badge style={styles.badgeRed}>Em andamento</Badge>
-              </View>
-              <View style={styles.outageDetailsRow}>
-                <Text style={styles.label}>Duração Atual: </Text>
-                <Text style={styles.valueRed}>{formatDuration(currentTimerDuration)}</Text>
-              </View>
-              {activeOutage.estimatedEnd && (
-                <View style={styles.outageDetailsRow}>
-                  <Text style={styles.label}>Prev. Término: </Text>
-                  <Text style={styles.value}>{formatTime(activeOutage.estimatedEnd)}</Text>
-                </View>
-              )}
+          <View style={styles.controlButtons}>
+            {!activeOutage ? (
               <Button
-                mode="outlined"
-                onPress={() => handleFinishActiveOutage(activeOutage.id)}
-                style={styles.buttonOutlineFull}
-                labelStyle={styles.buttonOutlineFullLabel}
+                mode="contained"
+                icon={() => <Play size={16} color="white" />}
+                onPress={startNewOutage}
+                style={styles.startButton}
+                labelStyle={styles.buttonLabel}
               >
-                Finalizar Registro
+                Iniciar Registro
               </Button>
-            </View>
-          ) : (
-            <Text style={styles.noOutagesText}>Nenhuma interrupção ativa no momento.</Text>
-          )}
+            ) : (
+              <>
+                {isRunning ? (
+                  <Button
+                    mode="outlined"
+                    icon={() => <Pause size={16} color="#6b7280" />}
+                    onPress={pauseTimer}
+                    style={styles.pauseButton}
+                    labelStyle={styles.buttonLabel}
+                  >
+                    Pausar
+                  </Button>
+                ) : (
+                  <Button
+                    mode="contained"
+                    icon={() => <Play size={16} color="white" />}
+                    onPress={startTimer}
+                    style={styles.resumeButton}
+                    labelStyle={styles.buttonLabel}
+                  >
+                    Retomar
+                  </Button>
+                )}
+
+                <Button
+                  mode="contained"
+                  icon={() => <CircleStop size={16} color="white" />}
+                  onPress={finishOutage}
+                  style={styles.stopButton}
+                  labelStyle={styles.buttonLabel}
+                >
+                  Finalizar
+                </Button>
+              </>
+            )}
+          </View>
         </Card.Content>
       </Card>
 
-      {/* Concluídas Recentemente */}
-      <Card style={styles.card}>
+      {activeOutage && (
+        <Card style={styles.activeCard}>
+          <Card.Content>
+            <View style={styles.sectionHeader}>
+              <Clock size={20} color="#dc2626" />
+              <Text style={styles.sectionTitle}>Interrupção em Andamento</Text>
+            </View>
+
+            <View style={styles.outageDetails}>
+              <Text style={styles.location}>{activeOutage.location}</Text>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Início:</Text>
+                <Text style={styles.detailValue}>
+                  {formatDate(activeOutage.startTime)} às{" "}
+                  {formatTime(activeOutage.startTime)}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Duração:</Text>
+                <Text style={styles.durationValue}>
+                  {formatDuration(outageDuration)}
+                </Text>
+              </View>
+            </View>
+          </Card.Content>
+        </Card>
+      )}
+
+      {}
+      <Card style={styles.historyCard}>
         <Card.Content>
           <View style={styles.sectionHeader}>
-            <CheckCircle size={20} color="#16A34A" />
-            <Text style={styles.sectionTitle}>Concluídas Recentemente</Text>
+            <CheckCircle size={20} color="#16a34a" />
+            <Text style={styles.sectionTitle}>Histórico de Interrupções</Text>
           </View>
-          {recentOutages.length > 0 ? (
-            recentOutages.map((item) => (
-              <View key={item.id} style={styles.outageCardRecent}>
-                <View style={styles.outageHeader}>
-                  <View>
-                    <Text style={styles.location}>{item.location}</Text>
-                    <Text style={styles.timeText}>
-                      {formatDate(item.startTime)}: {formatTime(item.startTime)} - {item.endTime ? formatTime(item.endTime) : 'N/A'}
-                    </Text>
-                  </View>
-                  <Badge style={styles.badgeGreen}>Concluído</Badge>
+
+          {pastOutages.length > 0 ? (
+            pastOutages.map((outage) => (
+              <View key={outage.id} style={styles.historyItem}>
+                <View style={styles.historyHeader}>
+                  <Text style={styles.location}>{outage.location}</Text>
+                  <Badge style={styles.completedBadge}>Concluído</Badge>
                 </View>
-                <View style={styles.outageDetailsRow}>
-                  <Text style={styles.label}>Duração Total: </Text>
-                  <Text style={styles.valueGreen}>{formatDuration(item.duration || 0)}</Text>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Duração:</Text>
+                  <Text style={styles.detailValue}>
+                    {formatDuration(outage.duration || 0)}
+                  </Text>
                 </View>
-                <Button
-                  mode="outlined"
-                  onPress={() => Alert.alert("Detalhes", `Ver relatório da interrupção em ${item.location}`)}
-                  style={styles.buttonOutlineFull}
-                  labelStyle={styles.buttonOutlineFullLabel}
-                >
-                  Ver Relatório
-                </Button>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Período:</Text>
+                  <Text style={styles.detailValue}>
+                    {formatTime(outage.startTime)} -{" "}
+                    {outage.endTime ? formatTime(outage.endTime) : "N/D"}
+                  </Text>
+                </View>
               </View>
             ))
           ) : (
-            <Text style={styles.noOutagesText}>Nenhum registro de interrupção concluída.</Text>
+            <Text style={styles.emptyText}>Nenhuma interrupção registrada</Text>
           )}
         </Card.Content>
       </Card>
 
-      {/* Estatísticas */}
-      <Card style={styles.card}>
+      {}
+      <Card style={styles.statsCard}>
         <Card.Content>
           <View style={styles.sectionHeader}>
-            <Info size={20} color="#2563EB" />
-            <Text style={styles.sectionTitle}>Estatísticas Gerais</Text>
+            <Info size={20} color="#3b82f6" />
+            <Text style={styles.sectionTitle}>Estatísticas</Text>
           </View>
-          <View style={styles.statsRow}>
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{totalEvents}</Text>
-              <Text style={styles.statLabel}>Total de Eventos</Text>
+
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{totalEvents}</Text>
+              <Text style={styles.statLabel}>Total de Interrupções</Text>
             </View>
-            <View style={[styles.statBox, { backgroundColor: '#FFEDD5' }]}>
-              <Text style={styles.statNumber}>{formatDuration(averageDurationMs)}</Text>
+
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {formatDuration(avgDuration)}
+              </Text>
               <Text style={styles.statLabel}>Duração Média</Text>
             </View>
           </View>
@@ -357,216 +352,200 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 16,
-    backgroundColor: '#F4F7F6', // Soft background
+    backgroundColor: "#f8fafc",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F4F7F6',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
+    color: "#64748b",
     fontSize: 16,
-    color: '#6B7280',
   },
-  card: {
-    marginBottom: 16,
+  controlPanel: {
     borderRadius: 12,
-    elevation: 2, // Softer shadow
-  },
-  // --- Cronômetro Rápido ---
-  blueBackground: {
-    backgroundColor: '#EFF6FF', // Light blue
-    alignItems: 'center',
-  },
-  quickTimerContent: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  iconCenter: {
-    marginBottom: 8,
-  },
-  quickTimerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1D4ED8',
-  },
-  quickTimerSubtitle: {
-    fontSize: 14,
-    color: '#3B82F6',
-    marginBottom: 16, // More space
-  },
-  currentTimerText: {
-    fontSize: 32, // Larger time display
-    fontWeight: 'bold',
-    color: '#111827',
+    backgroundColor: "#dbeafe",
     marginBottom: 20,
+    elevation: 3,
   },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 10, // Consistent gap
-    justifyContent: 'center',
-    width: '100%',
+  timerPanel: {
+    alignItems: "center",
+    paddingVertical: 24,
   },
-  actionButton: {
+  timerDisplay: {
+    fontSize: 42,
+    fontWeight: "800",
+    color: "#1e40af",
+    marginBottom: 4,
+    fontFamily: "monospace",
+  },
+  timerLabel: {
+    fontSize: 18,
+    color: "#3b82f6",
+    marginBottom: 20,
+    fontWeight: "500",
+  },
+  controlButtons: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  startButton: {
     flex: 1,
+    backgroundColor: "#16a34a",
     borderRadius: 8,
-    backgroundColor: '#16A34A', // Green for start
+    paddingVertical: 8,
   },
-  actionButtonLabel: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  actionButtonOutline: {
+  pauseButton: {
     flex: 1,
+    borderColor: "#94a3b8",
     borderRadius: 8,
-    borderColor: '#D1D5DB', // Light gray border
+    paddingVertical: 8,
+  },
+  resumeButton: {
+    flex: 1,
+    backgroundColor: "#3b82f6",
+    borderRadius: 8,
+    paddingVertical: 8,
+  },
+  stopButton: {
+    flex: 1,
+    backgroundColor: "#dc2626",
+    borderRadius: 8,
+    paddingVertical: 8,
+  },
+  buttonLabel: {
+    fontWeight: "600",
+    fontSize: 15,
+  },
+  activeCard: {
+    borderRadius: 12,
+    backgroundColor: "#ffedd5",
+    marginBottom: 20,
     borderWidth: 1,
-    backgroundColor: '#fff',
+    borderColor: "#fdba74",
+    elevation: 2,
   },
-  actionButtonOutlineLabel: {
-    color: '#374151', // Darker text
-    fontSize: 14,
-    fontWeight: '600',
+  historyCard: {
+    borderRadius: 12,
+    backgroundColor: "#f0fdf4",
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#86efac",
+    elevation: 2,
   },
-  // --- Seções Gerais ---
+  statsCard: {
+    borderRadius: 12,
+    backgroundColor: "#eff6ff",
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    elevation: 2,
+  },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18, // Larger section title
-    fontWeight: '700', // Bolder
-    color: '#1F2937',
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1e293b",
   },
-  noOutagesText: {
-    textAlign: 'center',
-    color: '#6B7280',
-    paddingVertical: 20,
-    fontSize: 14,
-  },
-  // --- Cards de Interrupção ---
-  outageCardActive: {
-    backgroundColor: '#FEE2E2', // Light red
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#FCA5A5', // Soft red border
-  },
-  outageCardRecent: {
-    backgroundColor: '#DCFCE7', // Light green
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#86EFAC', // Soft green border
-  },
-  outageHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+  outageDetails: {
+    paddingHorizontal: 8,
   },
   location: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#1e293b",
+    marginBottom: 12,
+  },
+  detailRow: {
+    flexDirection: "row",
+    marginBottom: 10,
+    alignItems: "center",
+  },
+  detailLabel: {
+    width: 90,
+    color: "#475569",
+    fontWeight: "500",
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
   },
-  timeText: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  badgeRed: {
-    backgroundColor: '#DC2626',
-    color: '#fff',
-    fontSize: 11, // Slightly smaller badge text
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 16, // Pill shape
-    textTransform: 'uppercase',
-    fontWeight: 'bold',
-  },
-  badgeGreen: {
-    backgroundColor: '#16A34A',
-    color: '#fff',
-    fontSize: 11,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 16,
-    textTransform: 'uppercase',
-    fontWeight: 'bold',
-  },
-  outageDetailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
-  },
-  label: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  value: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  valueRed: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#DC2626',
-  },
-  valueGreen: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#16A34A',
-  },
-  buttonOutlineFull: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingVertical: 10,
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  buttonOutlineFullLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  // --- Estatísticas ---
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  statBox: {
+  detailValue: {
     flex: 1,
-    backgroundColor: '#DBEAFE', // Light blue for general stats
+    color: "#334155",
+    fontSize: 16,
+  },
+  durationValue: {
+    flex: 1,
+    color: "#dc2626",
+    fontWeight: "700",
+    fontSize: 18,
+  },
+  historyItem: {
+    backgroundColor: "white",
     borderRadius: 10,
     padding: 16,
-    alignItems: 'center',
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: "#e2e8f0",
+    elevation: 1,
   },
-  statNumber: {
-    fontSize: 28, // Larger number
-    fontWeight: '800', // Extra bold
-    color: '#1F2937',
-    marginBottom: 4,
+  historyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  completedBadge: {
+    backgroundColor: "#16a34a",
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 1,
+    borderRadius: 20,
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#94a3b8",
+    paddingVertical: 20,
+    fontSize: 16,
+    fontStyle: "italic",
+  },
+  statsContainer: {
+    flexDirection: "row",
+    gap: 16,
+    justifyContent: "space-between",
+  },
+  statItem: {
+    flex: 1,
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 20,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    elevation: 1,
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#1e293b",
+    marginBottom: 8,
+    fontFamily: "monospace",
   },
   statLabel: {
-    fontSize: 13,
-    color: '#4B5563',
-    textAlign: 'center',
+    fontSize: 16,
+    color: "#64748b",
+    textAlign: "center",
+    fontWeight: "500",
   },
 });
 
-export default TempoScreen;
+export default OutageTrackerScreen;

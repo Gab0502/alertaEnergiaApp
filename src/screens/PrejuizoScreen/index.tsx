@@ -1,25 +1,23 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, ActivityIndicator } from "react-native";
 import { Card, Button, Badge } from "react-native-paper";
-import { AlertTriangle, Home, Building, DollarSign, Users, Plus, X, Calendar } from "lucide-react-native"; // Added X for modal close, Calendar for date input
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Import AsyncStorage
+import { AlertTriangle, Home, Building, DollarSign, Users, Plus, X, Calendar } from "lucide-react-native"; 
+import AsyncStorage from "@react-native-async-storage/async-storage"; 
 
-// --- Tipagem de Dados ---
-type Severity = "Crítico" | "Alto" | "Médio" | "Baixo"; // Added Baixo for completeness
+type Severity = "Crítico" | "Alto" | "Médio" | "Baixo"; 
 
 interface DamageReport {
   id: number;
   location: string;
-  type: "Residencial" | "Comercial" | "Público" | "Industrial" | "Outro"; // Specific types
+  type: "Residencial" | "Comercial" | "Público" | "Industrial" | "Outro"; 
   affectedUnits: number;
   estimatedCost: number;
   description: string;
   severity: Severity;
   reportedBy: string;
-  date: string; // YYYY-MM-DD
+  date: string; 
 }
 
-// --- Dados Iniciais (usados se AsyncStorage estiver vazio) ---
 const initialDamageReports: DamageReport[] = [
   {
     id: 1,
@@ -30,7 +28,7 @@ const initialDamageReports: DamageReport[] = [
     description: "Perda de alimentos em geladeiras, danos em equipamentos eletrônicos, interrupção de serviços essenciais.",
     severity: "Alto",
     reportedBy: "João Silva",
-    date: "2024-05-20", // Adjusted date for current context
+    date: "2024-05-20", 
   },
   {
     id: 2,
@@ -45,21 +43,19 @@ const initialDamageReports: DamageReport[] = [
   },
 ];
 
-// --- Configuração das Categorias de Prejuízo ---
 const damageCategoriesConfig = [
-  { icon: Home, label: "Residencial", type: "Residencial", color: "#E0F2FE", textColor: "#2563EB" }, // blue-100 / blue-600
-  { icon: Building, label: "Comercial", type: "Comercial", color: "#DCFCE7", textColor: "#16A34A" }, // green-100 / green-600
-  { icon: Users, label: "Público", type: "Público", color: "#EDE9FE", textColor: "#7C3AED" }, // purple-100 / purple-600
-  { icon: DollarSign, label: "Industrial", type: "Industrial", color: "#FFEDD5", textColor: "#EA580C" }, // orange-100 / orange-600
-  { icon: AlertTriangle, label: "Outro", type: "Outro", color: "#FEE2E2", textColor: "#DC2626" }, // red-100 / red-600
+  { icon: Home, label: "Residencial", type: "Residencial", color: "#E0F2FE", textColor: "#2563EB" }, 
+  { icon: Building, label: "Comercial", type: "Comercial", color: "#DCFCE7", textColor: "#16A34A" }, 
+  { icon: Users, label: "Público", type: "Público", color: "#EDE9FE", textColor: "#7C3AED" }, 
+  { icon: DollarSign, label: "Industrial", type: "Industrial", color: "#FFEDD5", textColor: "#EA580C" }, 
+  { icon: AlertTriangle, label: "Outro", type: "Outro", color: "#FEE2E2", textColor: "#DC2626" }, 
 ];
 
-// --- Cores de Severidade ---
 const severityColors: Record<Severity, { border: string; text: string }> = {
-  Crítico: { border: "#EF4444", text: "#DC2626" }, // Red
-  Alto: { border: "#F97316", text: "#EA580C" }, // Orange
-  Médio: { border: "#FACC15", text: "#EAB308" }, // Yellow
-  Baixo: { border: "#22C55E", text: "#16A34A" }, // Green
+  Crítico: { border: "#EF4444", text: "#DC2626" }, 
+  Alto: { border: "#F97316", text: "#EA580C" }, 
+  Médio: { border: "#FACC15", text: "#EAB308" }, 
+  Baixo: { border: "#22C55E", text: "#16A34A" }, 
 };
 
 const PrejuizosScreen = () => {
@@ -67,7 +63,6 @@ const PrejuizosScreen = () => {
   const [loading, setLoading] = useState(true);
   const [showReportModal, setShowReportModal] = useState(false);
 
-  // --- States para o formulário de novo prejuízo ---
   const [newReportLocation, setNewReportLocation] = useState("");
   const [newReportType, setNewReportType] = useState<DamageReport['type']>("Residencial");
   const [newReportAffectedUnits, setNewReportAffectedUnits] = useState("");
@@ -75,16 +70,14 @@ const PrejuizosScreen = () => {
   const [newReportDescription, setNewReportDescription] = useState("");
   const [newReportSeverity, setNewReportSeverity] = useState<Severity>("Médio");
   const [newReportReportedBy, setNewReportReportedBy] = useState("");
-  const [newReportDate, setNewReportDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+  const [newReportDate, setNewReportDate] = useState(new Date().toISOString().split('T')[0]); 
 
-  // --- Resumo de danos (calculado) ---
   const [damageSummary, setDamageSummary] = useState({
     categories: damageCategoriesConfig.map(cat => ({ ...cat, count: 0 })),
     totalCost: 0,
     totalAffectedPeople: 0,
   });
 
-  // Função para carregar relatórios do AsyncStorage
   const loadReports = useCallback(async () => {
     setLoading(true);
     try {
@@ -93,7 +86,7 @@ const PrejuizosScreen = () => {
       if (storedReports) {
         reports = JSON.parse(storedReports);
       } else {
-        // Se não houver relatórios salvos, usa os iniciais e os salva
+
         reports = initialDamageReports;
         await AsyncStorage.setItem("damageReports", JSON.stringify(initialDamageReports));
       }
@@ -101,14 +94,13 @@ const PrejuizosScreen = () => {
     } catch (error) {
       console.error("Erro ao carregar relatórios de prejuízos:", error);
       Alert.alert("Erro", "Não foi possível carregar os relatórios de prejuízos.");
-      // Fallback to initial data if loading fails
+
       setDamageReports(initialDamageReports);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Função para atualizar o resumo e totais com base nos relatórios
   const updateDamageSummary = useCallback((reports: DamageReport[]) => {
     let totalCost = 0;
     let totalAffectedPeople = 0;
@@ -118,7 +110,7 @@ const PrejuizosScreen = () => {
 
     reports.forEach(report => {
       totalCost += report.estimatedCost;
-      totalAffectedPeople += report.affectedUnits; // Assuming affectedUnits can roughly represent people/units
+      totalAffectedPeople += report.affectedUnits; 
       if (categoriesCount[report.type] !== undefined) {
         categoriesCount[report.type]++;
       }
@@ -136,17 +128,14 @@ const PrejuizosScreen = () => {
     });
   }, []);
 
-  // Efeito para carregar relatórios e atualizar resumo na montagem
   useEffect(() => {
     loadReports();
   }, [loadReports]);
 
-  // Efeito para atualizar resumo sempre que os relatórios mudarem
   useEffect(() => {
     updateDamageSummary(damageReports);
   }, [damageReports, updateDamageSummary]);
 
-  // Função para resetar o formulário do modal
   const resetForm = () => {
     setNewReportLocation("");
     setNewReportType("Residencial");
@@ -158,7 +147,6 @@ const PrejuizosScreen = () => {
     setNewReportDate(new Date().toISOString().split('T')[0]);
   };
 
-  // Função para lidar com o envio de um novo relatório
   const handleReportSubmit = async () => {
     if (!newReportLocation || !newReportAffectedUnits || !newReportEstimatedCost || !newReportDescription || !newReportReportedBy || !newReportDate) {
       Alert.alert("Erro", "Por favor, preencha todos os campos obrigatórios.");
@@ -178,7 +166,7 @@ const PrejuizosScreen = () => {
     }
 
     const newDamage: DamageReport = {
-      id: Date.now(), // Simple unique ID
+      id: Date.now(), 
       location: newReportLocation,
       type: newReportType,
       affectedUnits: units,
@@ -190,9 +178,9 @@ const PrejuizosScreen = () => {
     };
 
     try {
-      const updatedReports = [newDamage, ...damageReports]; // Add new report to the top
+      const updatedReports = [newDamage, ...damageReports]; 
       await AsyncStorage.setItem("damageReports", JSON.stringify(updatedReports));
-      setDamageReports(updatedReports); // Update state to trigger re-render and summary update
+      setDamageReports(updatedReports); 
       setShowReportModal(false);
       resetForm();
       Alert.alert("Sucesso", "Relatório de prejuízo enviado com sucesso!");
@@ -213,7 +201,7 @@ const PrejuizosScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Resumo dos Prejuízos */}
+      
       <Card style={styles.card}>
         <Card.Content>
           <Text style={styles.cardHeaderTitle}>Resumo dos Prejuízos</Text>
@@ -232,7 +220,7 @@ const PrejuizosScreen = () => {
         </Card.Content>
       </Card>
 
-      {/* Reportar Prejuízo */}
+      
       <Card style={styles.card}>
         <Card.Content>
           <TouchableOpacity
@@ -246,7 +234,7 @@ const PrejuizosScreen = () => {
         </Card.Content>
       </Card>
 
-      {/* Relatórios Recentes */}
+      
       <Card style={styles.card}>
         <Card.Content>
           <Text style={styles.cardHeaderTitle}>Relatórios Recentes</Text>
@@ -288,16 +276,7 @@ const PrejuizosScreen = () => {
                     </View>
                   </View>
                   <Text style={styles.reportReportedBy}>Reportado por: {report.reportedBy}</Text>
-                  {/*
-                  <View style={styles.reportActions}>
-                    <Button mode="outlined" style={styles.reportActionButtonSmall} labelStyle={styles.reportButtonLabel} onPress={() => {}}>
-                      Ver Detalhes
-                    </Button>
-                    <Button mode="outlined" style={styles.reportActionButtonSmall} labelStyle={styles.reportButtonLabel} onPress={() => {}}>
-                      Editar
-                    </Button>
-                  </View>
-                  */}
+                  
                 </View>
               );
             })
@@ -307,7 +286,7 @@ const PrejuizosScreen = () => {
         </Card.Content>
       </Card>
 
-      {/* Impacto Total */}
+      
       <Card style={[styles.card, styles.totalImpactCard]}>
         <Card.Content style={styles.totalImpactContent}>
           <AlertTriangle size={32} color="#B91C1C" style={{ marginBottom: 12 }} />
@@ -327,7 +306,7 @@ const PrejuizosScreen = () => {
         </Card.Content>
       </Card>
 
-      {/* Modal de Reportar Prejuízo */}
+      
       <Modal
         animationType="slide"
         transparent={true}
@@ -418,7 +397,7 @@ const PrejuizosScreen = () => {
                       style={[
                         styles.severityOption,
                         { borderColor: colors.border },
-                        newReportSeverity === currentSeverity && { backgroundColor: colors.border + '1A' } // 10% opacity
+                        newReportSeverity === currentSeverity && { backgroundColor: colors.border + '1A' } 
                       ]}
                       onPress={() => setNewReportSeverity(currentSeverity)}
                     >
@@ -429,7 +408,7 @@ const PrejuizosScreen = () => {
                   );
                 })}
               </View>
-              
+
               <Text style={styles.inputLabel}>Reportado por:</Text>
               <TextInput
                 style={styles.modalInput}
@@ -450,7 +429,7 @@ const PrejuizosScreen = () => {
                 placeholderTextColor="#9ca3af"
                 value={newReportDate}
                 onChangeText={setNewReportDate}
-                keyboardType="numbers-and-punctuation" // For date format
+                keyboardType="numbers-and-punctuation" 
               />
 
               <View style={styles.modalActions}>
@@ -485,7 +464,7 @@ const PrejuizosScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F4F7F6", // Soft background
+    backgroundColor: "#F4F7F6", 
     padding: 16,
   },
   loadingContainer: {
@@ -502,27 +481,27 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: 16,
     borderRadius: 12,
-    elevation: 2, // Softer shadow
+    elevation: 2, 
   },
   cardHeaderTitle: {
     fontSize: 18,
-    fontWeight: "700", // Bolder title
+    fontWeight: "700", 
     color: "#1F2937",
     marginBottom: 12,
   },
-  // --- Resumo dos Prejuízos ---
+
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 12, // Consistent gap
+    gap: 12, 
   },
   categoryBox: {
     width: "48%",
     padding: 16,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)', // Subtle border
+    borderColor: 'rgba(0,0,0,0.05)', 
   },
   categoryHeader: {
     flexDirection: "row",
@@ -535,21 +514,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   categoryCount: {
-    fontWeight: "800", // Extra bold
+    fontWeight: "800", 
     fontSize: 28,
   },
   categorySubText: {
     fontSize: 12,
     opacity: 0.9,
   },
-  // --- Reportar Prejuízo Action Button ---
+
   reportActionButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 15,
     borderRadius: 10,
-    backgroundColor: "#E0F2FE", // Light blue background
+    backgroundColor: "#E0F2FE", 
     borderColor: "#3B82F6",
     borderWidth: 1,
     gap: 10,
@@ -559,19 +538,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1E40AF",
   },
-  // --- Relatórios Recentes ---
+
   reportBox: {
-    backgroundColor: "#FFFFFF", // White background for each report
+    backgroundColor: "#FFFFFF", 
     borderRadius: 10,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#E5E7EB", // Subtle border
+    borderColor: "#E5E7EB", 
   },
   reportHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start", // Align items to top
+    alignItems: "flex-start", 
     marginBottom: 8,
   },
   reportLocation: {
@@ -588,7 +567,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     paddingVertical: 4,
     paddingHorizontal: 10,
-    borderRadius: 16, // Pill shape
+    borderRadius: 16, 
     textTransform: "uppercase",
     fontWeight: "bold",
     minWidth: 70,
@@ -598,7 +577,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#374151",
     marginBottom: 12,
-    lineHeight: 20, // Better readability
+    lineHeight: 20, 
   },
   reportDetailsGrid: {
     flexDirection: "row",
@@ -620,7 +599,7 @@ const styles = StyleSheet.create({
     color: "#1F2937",
   },
   estimatedCostValue: {
-    color: "#DC2626", // Red for cost
+    color: "#DC2626", 
   },
   reportReportedBy: {
     fontSize: 11,
@@ -647,10 +626,10 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     fontSize: 14,
   },
-  // --- Impacto Total ---
+
   totalImpactCard: {
-    backgroundColor: "#FEE2E2", // Soft red background
-    borderColor: "#DC2626", // Red border
+    backgroundColor: "#FEE2E2", 
+    borderColor: "#DC2626", 
     borderWidth: 1,
   },
   totalImpactContent: {
@@ -671,27 +650,26 @@ const styles = StyleSheet.create({
   totalImpactValue: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#B91C1C", // Darker red
+    color: "#B91C1C", 
     marginBottom: 4,
   },
   totalImpactLabel: {
     fontSize: 13,
-    color: "#991B1B", // Slightly lighter red
+    color: "#991B1B", 
     textAlign: 'center',
   },
 
-  // --- Estilos do Modal ---
   modalCenteredView: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.6)", // Darker overlay
+    backgroundColor: "rgba(0,0,0,0.6)", 
   },
   modalScrollViewContent: {
-    flexGrow: 1, // Allow content to grow if needed
+    flexGrow: 1, 
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 20, // Add vertical padding for scrollability
+    paddingVertical: 20, 
   },
   modalView: {
     backgroundColor: "white",
@@ -702,9 +680,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 8,
-    width: "92%", // Slightly wider modal
+    width: "92%", 
     position: 'relative',
-    marginVertical: 20, // Ensure it doesn't touch edges on small screens
+    marginVertical: 20, 
   },
   modalCloseButton: {
     position: 'absolute',
@@ -714,7 +692,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   modalTitle: {
-    fontSize: 22, // Larger title
+    fontSize: 22, 
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
@@ -729,24 +707,24 @@ const styles = StyleSheet.create({
   },
   modalInput: {
     width: "100%",
-    minHeight: 48, // Consistent height
+    minHeight: 48, 
     borderColor: "#D1D5DB",
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 15,
-    marginBottom: 10, // Less margin for compact form
+    marginBottom: 10, 
     fontSize: 16,
     color: "#374151",
-    backgroundColor: '#F9FAFB', // Light background for input
+    backgroundColor: '#F9FAFB', 
   },
   modalTextarea: {
-    height: 100, // Fixed height for description
-    textAlignVertical: "top", // Align text to top
+    height: 100, 
+    textAlignVertical: "top", 
   },
   typeSelectorContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center', // Center categories
+    justifyContent: 'center', 
     marginBottom: 15,
     gap: 8,
   },
@@ -757,10 +735,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'transparent', // Default transparent border
+    borderColor: 'transparent', 
   },
   typeOptionSelected: {
-    borderColor: '#3B82F6', // Blue border when selected
+    borderColor: '#3B82F6', 
   },
   typeOptionText: {
     fontSize: 14,

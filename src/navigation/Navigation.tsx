@@ -20,9 +20,9 @@ const Tab = createBottomTabNavigator();
 
 export default function Navigation() {
   return (
-    <SafeAreaView style={{ 
+    <SafeAreaView       style={{ 
       flex: 1,
-      paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 
+      paddingBottom: Platform.OS === 'android' ? 5 : 0 
     }}>
       <NavigationContainer>
         <Tab.Navigator
@@ -58,13 +58,6 @@ export default function Navigation() {
             tabBarLabelStyle: {
               paddingBottom: 5,
               fontSize: 12,
-            },
-            tabBarItemStyle: {
-              padding: 5,
-            },
-            tabBarStyle: {
-              height: 60,
-              paddingTop: 5,
             },
           })}
         >
